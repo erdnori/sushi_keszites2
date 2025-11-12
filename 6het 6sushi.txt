@@ -1,0 +1,154 @@
+Hallgatók és Tankönyvek lekérdezése és szűrése - 2 szövegdoboz és 2 listbox
+
+public partial class Form1 : Form
+{
+    TextbookSupportContext context = new TextbookSupportContext();
+    public Form1()
+    {
+        InitializeComponent();
+    }
+
+    private void Form1_Load(object sender, EventArgs e)
+    {
+        GetStudents();
+        GetTextbooks();
+    }
+
+    private void GetStudents()
+    {
+        studentBindingSource.DataSource =
+                (
+                    from s in context.Students
+                    where s.Name!.Contains(txtStudent.Text)
+                    select s
+                ).ToList();
+    }
+  
+    private void studentTextBox_TextChanged(object sender, EventArgs e)
+    {
+        GetStudents();
+    }
+
+kiválasztott hallgató megszerzése
+
+private void studentBindingSource_CurrentChanged(object sender, EventArgs e)
+{
+    Student currentSrudent = (Student)studentBindingSource.Current;
+
+    if (currentSrudent != null)
+    {
+    }
+}
+
+5.2a hallgató rendeléseinek listázása anonym osztállyal
+
+private void studentBindingSource_CurrentChanged(object sender, EventArgs e)
+{
+    Student currentStudent = (Student)studentBindingSource.Current;
+
+    if (currentStudent != null)
+    {
+        var ol = from x in context.Orders
+                 where x.StudentFk == currentStudent.StudentId
+                 select new
+                 {
+                     x.OrderSk,
+                     x.StudentFk,
+                     x.TextbookFkNavigation.Title
+                 };
+        listOrder.DataSource = ol.ToList();
+        listOrder.DisplayMember = "Title";
+    }
+}
+
+5.2b hallgató rendeléseinek listázása nevesített osztállyal
+
+public class OrderWithTitle
+{
+    public string Title { get; set; }
+    public int OrderSk { get; set; }
+}
+//
+private void studentBindingSource_CurrentChanged(object sender, EventArgs e)
+{
+    Student currentStudent = (Student)studentBindingSource.Current;
+
+    if (currentStudent != null)
+    {
+        var ol = from x in context.Orders
+                 where x.StudentFk == currentStudent.StudentId
+                 select new OrderWithTitle
+                 {
+                     OrderSk = x.OrderSk,                            
+                     Title = x.TextbookFkNavigation.Title
+                 };
+        orderWithTitleBindingSource.DataSource = ol.ToList();
+    }
+}
+
+
+Rendelés hozzáadása
+
+private void buttonAdd_Click(object sender, EventArgs e)
+{
+    //Megszerezzük a diák és a könyv kulcsát, hogy létre tudjunk hozni egy új rekordot 
+    //az Order táblában
+    Student student = studentBindingSource.Current as Student;
+    Textbook textbook = textbookBindingSource.Current as Textbook;
+
+    //Léterhozzuk az új megrendelést
+    Order o = new Order();
+    o.StudentFk = student.StudentId;
+    o.TextbookFk = textbook.TextbookId;
+
+    //Az új megrendelést felvesszük a táblába
+    context.Orders.Add(o);
+
+    try
+    {
+        context.SaveChanges();
+    }
+    catch (Exception ex)
+    {
+        //A releváns hibaüzentet az InnerException-ben van
+        MessageBox.Show(ex.InnerException.Message);
+    }
+
+    //Újraolvassuk a megrendeléseket
+    GetOrders();
+}
+
+Rendelés törlése
+
+private void buttonRemove_Click(object sender, EventArgs e)
+{
+    //Szerezzük meg a középső listában kiválasztott objektumot.
+    //Tartalmazza az OrderSk értékét is. Direkt így csináltuk!
+    var selectedOrderWithTitle = orderWithTitleBindingSource.Current as OrderWithTitle;
+
+    //Ha már meg van az OrderSk, meg lehet keresni a törlendő objektumot
+    var orderToDelete = from x in context.Orders
+                        where x.OrderSk == selectedOrderWithTitle.OrderSk
+                        select x;
+
+    //És akár törölni is lehet
+    context.Orders.Remove(orderToDelete.FirstOrDefault());
+    context.SaveChanges(); //Try-catch-be persze
+    GetOrders();
+}
+
+Tankönyvtámogatások összege
+
+double aidSum = double.Parse(aidSumTextBox.Text);
+double? orderSum = (from x in context.Orders
+                    select x.Textbook.Price).Sum();
+double? studentSum = (from x in context.Orders
+                      where x.StudentFK == student.StudentID
+                      select x.Textbook.Price).Sum();
+
+textBox2.Text = orderSum.ToString();
+textBox3.Text = studentSum.ToString();
+textBox4.Text = (aidSum / orderSum).ToString();
+textBox5.Text = (studentSum * aidSum / orderSum).ToString();
+
+
